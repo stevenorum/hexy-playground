@@ -49,6 +49,9 @@ CENTER = sercmd("C")
 # Head is servo #31
 # positive angle = looking left
 
+# Limb lengths (all in mm, from https://hexyrobot.wordpress.com/2015/11/20/hexapod-leg-kinematics/):
+lengths = (26,49,52)
+
 legs = {
     # Numbers are hip, thigh, knee, in that order.
     "LF":(7,6,5),
