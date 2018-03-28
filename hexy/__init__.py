@@ -7,18 +7,26 @@ import time
 
 from hexy import inki
 
+VERBOSE=False
+
+def vprint(*args, **kwargs):
+    if VERBOSE:
+        print(*args, **kwargs)
+        pass
+    pass
+
 class MockSerial(object):
     def __init__(self):
-        print("Creating mock serial object.")
+        vprint("Creating mock serial object.")
         self.is_open = False
         pass
 
     def open(self):
-        print("Opening mock serial connection.")
+        vprint("Opening mock serial connection.")
         self.is_open = True
 
     def close(self):
-        print("Closing mock serial connection.")
+        vprint("Closing mock serial connection.")
         self.is_open = False
 
     def __enter__(self):
@@ -31,7 +39,7 @@ class MockSerial(object):
     def write(self, s):
         if not self.is_open:
             raise RuntimeError("MockSerial not connected!")
-        print("Command sent to mock serial: {}".format(json.dumps(s.decode("utf-8"))))
+        vprint("Command sent to mock serial: {}".format(json.dumps(s.decode("utf-8"))))
 
 def dump_port_info(port):
     print(dir(port))
@@ -99,7 +107,6 @@ class Hexy(object):
         "RR":(16,17,18),
     }
 
-
     servo_signs = {
         # positive 1 indicates that a positive angle will move the appendage forwards or upwards
         # negative 1 indicates that a positive angle will move the appendage backwards or downwards
@@ -121,6 +128,8 @@ class Hexy(object):
         "RR":(0,0,0),
     }
 
+    default_offsets = {}
+
     leg_segment_lengths = inki.LEG_LENGTHS
 
     head_servo = 31
@@ -130,11 +139,24 @@ class Hexy(object):
     def __init__(self):
         self.serial = None
         self.legs = []
+        self.leg_map = {}
+        self.all_servos = []
         for leg in ["LF","LM","LR","RF","RM","RR"]:
             new_leg = Leg(self, servos=self.leg_servos[leg], offsets=self.servo_offsets[leg], signs=self.servo_signs[leg], lengths=self.leg_segment_lengths, origin=(0,0,0))
             setattr(self, leg, new_leg)
             self.legs.append(new_leg)
+            self.leg_map[leg] = new_leg
+            self.all_servos.extend(new_leg.servos)
         self.head = Head(self, offset=self.head_offset)
+        self.all_servos.append(self.head.servo)
+
+    def load_default_offsets_from_file(self, fname):
+        with open(fname) as f:
+            self.load_default_offsets(json.load(f))
+
+    def load_default_offsets(self, offsets):
+        for servo in self.all_servos:
+            servo.offset = offsets.get(str(servo.number), servo.offset)
 
     def connect(self):
         if not self.serial:
@@ -182,9 +204,13 @@ class Hexy(object):
 
     def _sleep(self, milliseconds):
         if isinstance(self.serial, MockSerial):
-            print("Mock sleeping for {} milliseconds...".format(milliseconds))
+            vprint("Mock sleeping for {} milliseconds...".format(milliseconds))
         else:
             time.sleep(float(milliseconds)/1000.0)
+
+    @needs_hexy
+    def center(self):
+        self.serial.write(CENTER)
 
     @needs_hexy
     def stop(self):
@@ -221,6 +247,9 @@ class Servo(object):
     def stop(self):
         self.hexy._stop(self.number)
 
+    def center(self):
+        self.set_abs_position(0)
+
 class Leg(object):
     def __init__(self, hexy, servos, offsets=(0,0,0), signs=(1,1,1), lengths=(26,49,52), origin=(0,0,0), start_angles=(0,-45,-45)):
         construct = lambda i: Servo(hexy=hexy, number=servos[i], offset=offsets[i], sign=signs[i], start_angle=start_angles[i])
@@ -228,6 +257,11 @@ class Leg(object):
         self.thigh_servo = construct(1)
         self.knee_servo = construct(2)
         self.servos = [self.hip_servo, self.thigh_servo, self.knee_servo]
+        self.servo_map = {
+            "hip":self.hip_servo,
+            "thigh":self.thigh_servo,
+            "knee":self.knee_servo
+        }
         self.hip_length = lengths[0]
         self.thigh_length = lengths[1]
         self.knee_length = lengths[2]
