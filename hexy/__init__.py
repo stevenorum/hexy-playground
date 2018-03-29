@@ -61,7 +61,7 @@ def find_port(attr="product", value="servotor32", fallback_to_mock=False):
     for p in ports:
         # dump_port_info(p)
         if getattr(p, attr, None) and value.lower() in getattr(p, attr, "").lower():
-            return p.device
+            return serial.Serial(p.device, 9600)
         pass
     if fallback_to_mock:
         return MockSerial()
@@ -102,6 +102,8 @@ class Hexy(object):
         "LF":(7,6,5),
         "LM":(11,10,9),
         "LR":(15,14,13),
+        # NOTE: I think Jeff's servo #24 (right front hip) needs to be replaced.
+        # It seems to have a strangely limited range of motion.
         "RF":(24,25,26),
         "RM":(20,21,22),
         "RR":(16,17,18),

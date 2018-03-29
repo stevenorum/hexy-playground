@@ -85,6 +85,7 @@ if args.infile:
 jeff = Hexy() # I've named my Hexy Jeff.  No particular reason, just seemed like a good name.
 jeff.connect()
 jeff.center()
+jeff._sleep(250)
 jeff.stop()
 
 servo_map = {"Head":jeff.head.servo}
